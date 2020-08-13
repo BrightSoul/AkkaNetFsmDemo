@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/noty@3.2.0-beta/lib/noty.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/noty@3.2.0-beta/lib/themes/mint.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300&display=swap');
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+        * {
+            font-family: Roboto, sans-serif;
+        }
+        h1 {
+            padding-top: 0;
+            margin-top: 0;
+            font-weight: normal;
+        }
+        h2 {
+            padding: 0;
+            margin: 0;
+            padding-top: 30px;
+            font-weight: normal;
+        }
+        p {
+            margin: 0;
+            padding: 0;
+        }
+        main {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+        header {
+            margin: 5px;
+        }
+        .cart {
+            margin: 5px;
+            line-height: 150%;
+            border-top: 1px solid #ccc;
+            border-bottom: 1px solid #ccc;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+        .toolbar {
+            flex: 1;
+            margin: 5px;
+            opacity: 0.2;
+            pointer-events: none;
+        }
+        .toolbar.ready {
+            opacity: 1.0;
+            pointer-events: all;
+        }
+        .log {
+            height: 33%;
+            background-color: #eee;
+            overflow-y: scroll;
+            overflow-x: auto;
+            border-top: 1px solid #ccc;
+            padding: 5px;
+            font-size: 13px;
+            font-family: monospace;
+        }
+        .add {
+            background-color: green;
+            color: white;
+        }
+        .subtract {
+            background-color: darkred;
+            color: white;
+        }
+        .add, .subtract, .confirm {
+            border: 0;
+            border-radius: 3px;
+            padding: 2px;
+            width: 30px;
+            font-size: 20px;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+        .confirm {
+            background-color: peru;
+            color: white;
+            width: auto;
+            font-size: 14px;
+            padding: 7px;
+        }
+        select {
+            padding: 5px;
+            vertical-align: middle;
+            width: 160px;
+        }
+        .empty {
+            color: #888;
+        }
+        .status {
+            background-color: lightgoldenrodyellow;
+        }
+        dt, dd {
+            display: block;
+            float: left;
+        }
+        dt {
+            font-weight: bold;
+            min-width: 200px;
+            clear: left;
+        }
+        dd {
+            min-width: 50px;
+            text-align: right;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <header>
+            <h1>Akka.NET FSM demo (w/ MQTT.NET)</h1>
+            <p>This application models a shopping cart with a finite state machine using Akka.NET actors. Side effects are also enacted by actors: in this case they consist of just domain events being echoed to the client via MQTT.NET.</p>
+            <h2>Your shopping cart</h2>
+        </header>
+        <section class="cart">
+            <p class="empty">Your cart is empty</p>
+        </section>
+        <section class="toolbar">
+            <form>
+                <label for="product">Add/remove</label>
+                <select name="product">
+                    <option>Product A</option>
+                    <option>Product B</option>
+                    <option>Product C</option>
+                    <option></option>
+                </select>
+                <button type="button" class="add" onclick="addProduct(this.form.product.value)">+</button>
+                <button type="button" class="subtract" onclick="removeProduct(this.form.product.value)">-</button>
+                &nbsp;&nbsp;or&nbsp;&nbsp;
+                <button type="button" class="confirm" onclick="confirmCart()">Confirm cart</button>
+            </form>
+        </section>
+        <section class="log"><strong>Domain Events Log</strong></section>
+    </main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.1.0/mqtt.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/noty@3.2.0-beta/lib/noty.min.js"></script>
+    <script>
+        var client = mqtt.connect('mqtts://localhost:5001/mqtt');
+
+        client.on('connect', function () {
+            client.subscribe('notifications', function (err) {
+                if (err) {
+                    console.error('Error subscribing the "notifications" topic');
+                } else {
+                    document.querySelector(".toolbar").classList.add("ready");
+                    console.log('Subscribed the "notifications" topic, requesting cart contents now...');
+                    getCart();
+                }
+            });
+        });
+
+        function addProduct(productName) {
+            publish({ Name: "AddProduct", ProductName: productName });
+        }
+
+        function removeProduct(productName) {
+            publish({ Name: "RemoveProduct", ProductName: productName });
+        }
+
+        function confirmCart(productName) {
+            publish({ Name: "ConfirmCart" });
+        }
+
+        function publish(payload) {
+            client.publish('commands', JSON.stringify(payload));
+        }
+
+        client.on('message', function (topic, buffer) {
+            var payload = buffer.toString();
+            if (topic != 'notifications') {
+                console.log("Ignored message from topic", topic, payload);
+                return;
+            }
+            var message = JSON.parse(payload);
+            switch(message.Name) {
+                case "DomainEvent":
+                    log(message.DomainEventName + ' ' + JSON.stringify(message.Payload));
+                    getCart();
+                    break;
+                case "Error":
+                    notify(message.Reason);
+                    break;
+                case "Cart":
+                    render(message);
+                    break;
+                default:
+                    console.error('Message name "' + message.Name + '" not supported');
+                    break;
+            }
+        });
+
+        function render(cartStatus) {
+            var cart = document.querySelector('.cart');
+            cart.innerHTML = '';
+            
+            if (cartStatus.IsConfirmed) {
+                //var confirmationStatus = document.createElement('p');
+                //confirmationStatus.classList.add('status');
+                //confirmationStatus.textContent = "Cart is CONFIRMED. You can no longer add or remove products. Delete Data/app.db if you want to try again.";
+                //cart.appendChild(confirmationStatus);
+            }
+
+            if (!cartStatus.Lines || cartStatus.Lines.length == 0) {
+                var emptyCart = document.createElement('p');
+                emptyCart.classList.add('empty');
+                emptyCart.textContent = "Your cart is currently empty";
+                cart.appendChild(emptyCart);
+                return;
+            }
+            var cartLines = document.createElement('dl');
+            for (var i = 0; i < cartStatus.Lines.length; i++) {
+                var productName = document.createElement('dt');
+                productName.textContent = cartStatus.Lines[i].ProductName;
+                cartLines.appendChild(productName);
+                var productQuantity = document.createElement('dd');
+                productQuantity.textContent = cartStatus.Lines[i].Quantity;
+                cartLines.appendChild(productQuantity);
+            }
+            cart.appendChild(cartLines);
+        }
+
+        var getCartToken;
+        function getCart() {
+            if (getCartToken) {
+                clearTimeout(getCartToken);
+            }
+            //Debounce
+            getCartToken = setTimeout(function() {
+                publish({ Name: "GetCart" });
+            }, 200);
+        }
+
+        function notify(text) {
+            (new Noty({
+                text: text,
+                type: 'error',
+                layout: 'topRight',
+                theme: 'mint',
+                timeout: '3000',
+                progressBar: true,
+                closeWith: ['click']
+            })).show();
+        }
+
+        function log(text) {
+            var logEntry = document.createElement('div');
+            logEntry.innerText = (new Date()).toTimeString().split(' ')[0] + ' ' + text;
+            var log = document.body.querySelector('.log');
+            log.appendChild(logEntry);
+            log.scrollTop = log.scrollHeight;
+        }
+    </script>
+</body>
+
+</html>
