@@ -1,5 +1,5 @@
 # Akka.NET Finite State Machine Demo
-This is a sample ASP.NET Core project using [Akka.NET](https://getakka.net/) to model a simple shopping cart that goes through 3 states:
+This is an ASP.NET Core **demo project** using [Akka.NET](https://getakka.net/) to model a simple shopping cart that goes through 3 states:
   * `Empty` you can only add products in this state. Remove and confirm are not allowed here;
   * `NonEmpty` you can add products, remove existing products or confirm the cart;
   * `Confirmed` no more commands are acceptable in this state. The cart is effectively "frozen";
@@ -36,3 +36,6 @@ The HTML interface uses the [MQTT.js](https://github.com/mqttjs/MQTT.js) JavaScr
 > Why MQTT and not [ASP.NET Core SignalR](https://docs.microsoft.com/en-us/aspnet/core/signalr/introduction), you ask? Well, because for this demo I needed to experiment with some extended features, such as _QoS levels_, _retaining messages_ and the _request/response pattern_. SignalR is not providing any of that out of the box.
 
 Whenever a domain event is persisted, it's also echoed to connected clients via MQTT as a side effect. You can see it happening in the [Models/Actors/EventHandlers/NotificationActor.cs](Models/Actors/EventHandlers/NotificationActor.cs) file.
+
+## TODOs
+You'll find some `//TODO` comments scattered in the project. Those are notes for future updates that might come in this demo. Again, **this is just a demo project so it cannot be used in production as it is.**
