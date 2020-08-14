@@ -80,10 +80,13 @@ namespace AkkanetFsmDemo.Models.Services.Infrastructure
             var actorMaterializer = actorSystem.Materializer();
             var readJournal = PersistenceQuery.Get(actorSystem).ReadJournalFor<SqlReadJournal>("akka.persistence.query.journal.sql");
             readJournal
-                    .EventsByPersistenceId(options.PersistenceId, 0, long.MaxValue)
+                    //TODO: [THIS IS MOST PROBABLY A BIG ISSUE] if we always query from sequence number 0, then all
+                    //event handlers will produce side effects again and again, each time domain events are replayed.
+                    //(e.g. this is obsiously a problem if your event handlers send emails)
+                    .EventsByPersistenceId(options.PersistenceId, fromSequenceNr: 0, toSequenceNr: long.MaxValue)
                     .Collect(envelope => envelope.Event)
                     .RunWith(Sink.ActorRef<object>(primaryEventHandler, new object()
-                    //TODO: complete here
+                    //TODO: you might want to provide these options
                     //.RunWith(Sink.ActorRefWithAck<ItemAdded>(writer, 
                     //onInitMessage: CreateViewsActor.Init.Instance,
                     //ackMessage: CreateViewsActor.Ack.Instance,

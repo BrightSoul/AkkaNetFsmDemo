@@ -23,18 +23,18 @@ namespace AkkanetFsmDemo.Models.Actors.CommandHandlers
             ConfigureRecoverableEvents();
 
             //TODO: should we rely on Become or just have one single state and validate commands depending on the value of a "Status" field?
-            EmptyCart();
+            Empty();
         }
 
         //Machine states
-        private void EmptyCart()
+        private void Empty()
         {
             Command<GetCart>(Handle);
             Command<AddProduct>(Handle, Validate);
             CommandAny(Discard);
         }
 
-        private void NonEmptyCart()
+        private void NonEmpty()
         {
             Command<GetCart>(Handle);
             Command<AddProduct>(Handle, Validate);
@@ -43,7 +43,7 @@ namespace AkkanetFsmDemo.Models.Actors.CommandHandlers
             CommandAny(Discard);
         }
 
-        private void ConfirmedCart()
+        private void Confirmed()
         {
             Command<GetCart>(Handle);
             CommandAny(Discard);
@@ -93,7 +93,7 @@ namespace AkkanetFsmDemo.Models.Actors.CommandHandlers
                 //Just update its quantity
                 cartLine.Quantity++;
             }
-            Become(NonEmptyCart);
+            Become(NonEmpty);
         }
 
         //Remove product
@@ -124,7 +124,7 @@ namespace AkkanetFsmDemo.Models.Actors.CommandHandlers
             }
             if (!cartState.Lines.Any())
             {
-                Become(EmptyCart);
+                Become(Empty);
             }
         }
 
@@ -143,7 +143,7 @@ namespace AkkanetFsmDemo.Models.Actors.CommandHandlers
 
         private void Apply(CartConfirmed cartConfirmed) {
             cartState.IsConfirmed = true;
-            Become(ConfirmedCart);
+            Become(Confirmed);
         }
 
 
