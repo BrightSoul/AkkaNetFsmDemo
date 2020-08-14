@@ -32,6 +32,8 @@ namespace AkkanetFsmDemo.Models.Services.Infrastructure
             actorSystem = CreateActorSystem(config, dependencyResolver);
             primaryCommandHandler = CreatePrimaryCommandHandler(actorSystem, options);
             primaryEventHandler = CreatePrimaryEventHandler(actorSystem, options);
+            //TODO: here we assume only one Persistence Query will be needed throughout the application life cycle
+            //If this is not the case, then we should not create it here. Instead, it should be created by a command handler actor and live in its scope.
             actorMaterializer = ConfigureEventHandling(actorSystem, primaryEventHandler, options);
         }
 

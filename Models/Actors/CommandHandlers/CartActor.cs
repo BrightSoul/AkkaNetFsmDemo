@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
-using Akka.Event;
 using Akka.Persistence;
 using AkkanetFsmDemo.Models.CommandResults;
 using AkkanetFsmDemo.Models.Commands;
@@ -10,7 +6,6 @@ using AkkanetFsmDemo.Models.DomainEvents;
 using AkkanetFsmDemo.Models.Dto;
 using AkkanetFsmDemo.Models.Options;
 using AkkanetFsmDemo.Models.Responses;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace AkkanetFsmDemo.Models.Actors.CommandHandlers
@@ -25,17 +20,10 @@ namespace AkkanetFsmDemo.Models.Actors.CommandHandlers
         {
             persistenceId = options.CurrentValue.PersistenceId;
             cartState = new CartState();
-            SetRecover();
+            ConfigureRecoverableEvents();
 
             //TODO: should we rely on Become or just have one single state and validate commands depending on the value of a "Status" field?
             EmptyCart();
-        }
-
-        private void SetRecover()
-        {
-            Recover<ProductAdded>(Apply);
-            Recover<ProductRemoved>(Apply);
-            Recover<CartConfirmed>(Apply);
         }
 
         //Machine states
@@ -61,10 +49,18 @@ namespace AkkanetFsmDemo.Models.Actors.CommandHandlers
             CommandAny(Discard);
         }
 
+        //Recoverable events        
+        private void ConfigureRecoverableEvents()
+        {
+            Recover<ProductAdded>(Apply);
+            Recover<ProductRemoved>(Apply);
+            Recover<CartConfirmed>(Apply);
+        }
+
+
         //Get cart
         private void Handle(GetCart command)
         {
-            //TODO: Should return an immutable instance
             Respond(CartResponse.FromCartState(cartState));
         }
 
@@ -135,7 +131,8 @@ namespace AkkanetFsmDemo.Models.Actors.CommandHandlers
         //Confirm cart
         private bool Validate(ConfirmCart command)
         {
-            return true;
+            //If this command is acceptable by the current state, then we will accept it
+            return Accept();
         }
 
         private void Handle(ConfirmCart command)

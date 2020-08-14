@@ -4,7 +4,9 @@ using System.Threading.Tasks;
 using Akka.Actor;
 using AkkanetFsmDemo.Models.CommandResults;
 using AkkanetFsmDemo.Models.Commands;
+using AkkanetFsmDemo.Models.Options;
 using AkkanetFsmDemo.Models.Responses;
+using Microsoft.Extensions.Options;
 
 namespace AkkanetFsmDemo.Models.Services.Infrastructure
 {
@@ -12,10 +14,12 @@ namespace AkkanetFsmDemo.Models.Services.Infrastructure
     {
         private readonly IActorSystemAccessor actorSystemAccessor;
         private readonly INotificationSender notificationSender;
-        public ActorSystemCommandSender(IActorSystemAccessor actorSystemAccessor, INotificationSender notificationSender)
+        private readonly IOptionsMonitor<ActorSystemOptions> options;
+        public ActorSystemCommandSender(IActorSystemAccessor actorSystemAccessor, INotificationSender notificationSender, IOptionsMonitor<ActorSystemOptions> options)
         {
             this.actorSystemAccessor = actorSystemAccessor;
             this.notificationSender = notificationSender;
+            this.options = options;
         }
 
         public async Task SendCommand(byte[] payload)
@@ -25,7 +29,8 @@ namespace AkkanetFsmDemo.Models.Services.Infrastructure
                 await NotifyError("Command not understood");
                 return;
             }
-            var commandResult = await actorSystemAccessor.PrimaryCommandHandler.Ask<ICommandResult>(command);
+            ICommandResult? commandResult = await GetCommandResult(command);
+
             switch (commandResult)
             {
                 case CommandAccepted commandAccepted:
@@ -39,6 +44,12 @@ namespace AkkanetFsmDemo.Models.Services.Infrastructure
                     //This command is not acceptable at the state the FSM in in
                     await NotifyError("Cannot send this command now");
                     break;
+                case CommandTimedOut commandTimedOut:
+                    await NotifyError("The command handler did not respond in a timely fashion");
+                    break;
+                case CommandFailed commandFailed:
+                    await NotifyError($"An error occurred while handling the command: {commandFailed.Reason}");
+                    break;
                 case ICommandResultWithResponse commandResponse:
                     //TODO: should we notify just the sender? Right now we're notifying everybody
                     //Should use MQTT5 Request/Response pattern
@@ -46,8 +57,25 @@ namespace AkkanetFsmDemo.Models.Services.Infrastructure
                     await notificationSender.SendNotification(commandResponse.Response);
                     break;
                 default:
-                    await NotifyError($"Command result not supported: '{commandResult?.GetType().FullName}'");
+                    await NotifyError($"Command result not supported: '{commandResult?.GetType().FullName ?? "<null>"}'");
                     break;
+            }
+        }
+
+        private async Task<ICommandResult?> GetCommandResult(ICommand command)
+        {
+            try
+            {
+                var timeout = TimeSpan.FromMilliseconds(options.CurrentValue.AskTimeoutInMilliseconds);
+                return await actorSystemAccessor.PrimaryCommandHandler.Ask<ICommandResult?>(command, timeout);
+            }
+            catch (AskTimeoutException)
+            {
+                return new CommandTimedOut();
+            }
+            catch (Exception exc)
+            {
+                return new CommandFailed(exc.Message);
             }
         }
 

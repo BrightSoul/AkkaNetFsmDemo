@@ -2,7 +2,9 @@ using System;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using AkkanetFsmDemo.Models.DomainEvents;
 using AkkanetFsmDemo.Models.Options;
+using AkkanetFsmDemo.Models.Responses;
 using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Client;
@@ -22,7 +24,7 @@ namespace AkkanetFsmDemo.Models.Services.Infrastructure
         }
 
         public async Task SendNotification(object data, CancellationToken cancellationToken = default(CancellationToken))
-        {
+        {          
             using var mqttClient = CreateClient();
             var mqttClientOptions = CreateClientOptions();
             var result = await mqttClient.ConnectAsync(mqttClientOptions, cancellationToken);

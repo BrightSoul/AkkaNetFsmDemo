@@ -124,7 +124,7 @@
     <main>
         <header>
             <h1>Akka.NET FSM demo (w/ MQTT.NET)</h1>
-            <p>This application models a shopping cart with a finite state machine using Akka.NET actors. Side effects are also enacted by actors: in this case they consist of just domain events being echoed to the client via MQTT.NET.</p>
+            <p>This application models a shopping cart with a finite state machine using Akka.NET actors. Side effects are also enacted by actors: in this case they consist of just domain events being echoed to the client via MQTTnet.</p>
             <h2>Your shopping cart</h2>
         </header>
         <section class="cart">
@@ -150,7 +150,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.1.0/mqtt.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/noty@3.2.0-beta/lib/noty.min.js"></script>
     <script>
-        var client = mqtt.connect('mqtts://localhost:5001/mqtt');
+        var client = mqtt.connect('mqtts://localhost:5001/mqtt', {
+            protocolVersion: 5
+        });
 
         client.on('connect', function () {
             client.subscribe('notifications', function (err) {
@@ -209,10 +211,10 @@
             cart.innerHTML = '';
             
             if (cartStatus.IsConfirmed) {
-                //var confirmationStatus = document.createElement('p');
-                //confirmationStatus.classList.add('status');
-                //confirmationStatus.textContent = "Cart is CONFIRMED. You can no longer add or remove products. Delete Data/app.db if you want to try again.";
-                //cart.appendChild(confirmationStatus);
+                var confirmationStatus = document.createElement('p');
+                confirmationStatus.classList.add('status');
+                confirmationStatus.textContent = "Cart is CONFIRMED. You can no longer add or remove products. Delete Data/app.db if you want to try again.";
+                cart.appendChild(confirmationStatus);
             }
 
             if (!cartStatus.Lines || cartStatus.Lines.length == 0) {
